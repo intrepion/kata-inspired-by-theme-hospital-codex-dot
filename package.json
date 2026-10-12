@@ -1,1 +1,22 @@
-{"name":"oddwell-hospital","version":"1.0.0","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1 --port 5206 --strictPort","build":"tsc --noEmit && vite build","typecheck":"tsc --noEmit","test":"vitest run","preview":"vite preview --host 127.0.0.1 --port 5206 --strictPort"},"devDependencies":{"@types/node":"^24.0.0","typescript":"~5.9.3","vite":"^8.3.4","vitest":"^5.0.3"}}
+{
+  "name": "oddwell-hospital",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5206 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "preview": "vite preview --host 127.0.0.1 --port 5206 --strictPort",
+    "serve:detached": "node scripts/serve.mjs start",
+    "serve:restart": "node scripts/serve.mjs restart",
+    "serve:stop": "node scripts/serve.mjs stop"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
+  }
+}
