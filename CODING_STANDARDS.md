@@ -1,0 +1,2 @@
+# Coding standards
+Strict TypeScript. Keep simulation free of DOM, storage and wall-clock calls. Mutations enter through public commands; reject invalid operations before effects. Fixed ticks determine outcomes. UI treats saves as untrusted and validates before replacing state. Escape dynamic markup. Accessible controls and interruptible dialog state belong in UI. Tests assert externally observable domain behavior with worked examples.
