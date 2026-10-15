@@ -1346,3 +1346,81 @@ dialog p {
 #outcome-actions:not(:empty) {
   margin-top: 12px;
 }
+
+.blueprint-controls {
+  padding: 12px;
+  background: #f0f3e5;
+  border: 1px solid #a3ba9f;
+  margin-bottom: 10px;
+}
+.blueprint-controls[hidden] {
+  display: none;
+}
+.blueprint-controls fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  border: 0;
+  padding: 0 0 10px;
+}
+.blueprint-controls legend {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.blueprint-controls label {
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  gap: 4px;
+}
+.blueprint-controls input {
+  width: 65px;
+  padding: 7px;
+}
+.blueprint-controls select {
+  padding: 7px;
+}
+.blueprint-controls button {
+  margin: 2px 5px 0 0;
+}
+.tiles {
+  touch-action: none;
+}
+.door.north {
+  bottom: auto;
+  top: -5px;
+  height: 7px;
+}
+.door.south {
+  top: auto;
+  bottom: -5px;
+  height: 7px;
+}
+.door.west {
+  left: -5px;
+  bottom: auto;
+  width: 7px;
+}
+.door.east {
+  left: auto;
+  right: -5px;
+  bottom: auto;
+  width: 7px;
+}
+.door-marker {
+  position: absolute;
+  background: #d8f5c977;
+  border: 2px solid #27664e;
+  display: grid;
+  place-items: center;
+  font-weight: bold;
+}
+.door-marker.invalid {
+  background: #eb988c77;
+  border-color: #a33535;
+}
+
+.door-marker {
+  pointer-events: none;
+  z-index: 8;
+}

@@ -25,8 +25,19 @@ import {
   contains,
   equal,
   eligible,
+  door,
+  roomPrice,
+  blueprintFromDrag,
 } from "./game";
-import type { RoomKind, Role, Room, Patient } from "./game";
+import type {
+  RoomKind,
+  Role,
+  Room,
+  Patient,
+  RoomLayout,
+  DoorSide,
+  Point,
+} from "./game";
 let game = createGame(),
   paused = true,
   speed = 1,
@@ -37,6 +48,9 @@ let accumulator = 0,
   last = performance.now(),
   dialogAction: (() => void) | null = null,
   returnFocus: HTMLElement | null = null;
+let draft: (RoomLayout & Point) | null = null;
+let draftPhase: "size" | "door" = "size";
+let dragStart: Point | null = null;
 const storageKey = "oddwell-hospital-v1";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const money = (n: number) =>
@@ -55,7 +69,7 @@ app.innerHTML = `<header class="topbar"><a class="brand" href="#" aria-label="Od
 <main><section class="heading"><div><p class="eyebrow" id="chapter"></p><h1 id="scenario-name"></h1><p id="scenario-brief"></p></div><div class="seal"><span>DEPARTMENT OF</span><b>PECULIAR<br>CARE</b><span>EST. WHENEVER</span></div></section>
 <section id="metrics" class="metrics" aria-label="Hospital dashboard"></section>
 <div class="workspace"><section class="floor-panel"><div class="section-heading"><div><p class="eyebrow">THE FLOOR PLAN</p><h2>Make room for the unusual.</h2></div><div class="time-controls"><span id="clock"></span>${button("pause", "▶ Open clinic", "primary", 'id="pause"')}${[1, 2, 4].map((n) => button(`speed:${n}`, `${n}×`, "speed", `aria-label="Speed ${n} times" aria-pressed="${n === 1}"`)).join("")}</div></div>
-<div class="build-toolbar" id="build-toolbar"></div><div class="plan-status" id="plan-status" role="status">Select a room, then a tile. Build while paused.</div><div class="floor-scroll"><div class="floor-frame"><div class="north-label">ODDWELL MUNICIPAL HEALTH SERVICE <span>↑ NORTH</span></div><div id="floor" class="floor"><div id="tiles" class="tiles"></div><div id="scenery" aria-hidden="true"></div><div id="room-art" aria-hidden="true"></div><div id="people" aria-hidden="true"></div><div id="preview" aria-hidden="true"></div></div><div class="floor-bottom"><span>↳ RECEPTION</span><span class="floor-legend">● Patient &nbsp; ✚ Clinician &nbsp; ⌁ Technician &nbsp; ▰ Door</span></div></div></div>
+<div class="build-toolbar" id="build-toolbar"></div><div class="plan-status" id="plan-status" role="status">Select a room, drag its rectangle, choose a wall door, then confirm.</div><div id="blueprint-controls" class="blueprint-controls" hidden></div><div class="floor-scroll"><div class="floor-frame"><div class="north-label">ODDWELL MUNICIPAL HEALTH SERVICE <span>↑ NORTH</span></div><div id="floor" class="floor"><div id="tiles" class="tiles"></div><div id="scenery" aria-hidden="true"></div><div id="room-art" aria-hidden="true"></div><div id="people" aria-hidden="true"></div><div id="preview" aria-hidden="true"></div></div><div class="floor-bottom"><span>↳ RECEPTION</span><span class="floor-legend">● Patient &nbsp; ✚ Clinician &nbsp; ⌁ Technician &nbsp; ▰ Door</span></div></div></div>
 <div class="notice" id="notice"></div><div id="outcome-actions"></div><section class="objectives" id="objectives" aria-label="Accreditation objectives"></section><div class="footer-note">Entirely fictional ailments. Entirely earnest management.<span>Built with care · No medical advice · No audio</span></div></section>
 <aside><div class="tabs" role="tablist" aria-label="Management panels">${(["rooms", "staff", "patients"] as const).map((p) => button(`panel:${p}`, p[0].toUpperCase() + p.slice(1), "", `role="tab" aria-selected="${p === "rooms"}"`)).join("")}</div><div id="sidebar"></div><div class="grant-box"><span class="eyebrow">A LITTLE SAFETY NET</span><h3>Council emergency grant</h3><p>One rescue per scenario. No paperwork, just a mildly disappointed pigeon.</p>${button("grant", "Request $1,800", "", `id="grant"`)}</div><div class="tip"><span>DIRECTOR’S NOTE</span><p id="director-tip"></p></div></aside></div></main><div id="toast" role="status" aria-live="polite"></div>
 <dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-top"><span class="brand-mark">✚</span>${button("close-dialog", "×", "icon", 'aria-label="Close dialog"')}</div><p class="eyebrow" id="dialog-eyebrow"></p><h2 id="dialog-title"></h2><div id="dialog-content"></div><div id="dialog-actions" class="dialog-actions"></div></dialog>`;
@@ -102,7 +116,7 @@ function closeDialog() {
 function handbook() {
   openDialog(
     "A crash course in peculiar care",
-    `<p class="dialog-lead">Build a small hospital. Make unusual people feel better. Stay solvent.</p><ol class="handbook"><li><b>Plan while paused.</b> Pick Consultation, then click a clear tile. Each room uses 2×2 tiles with a door below its left corner. Corridors must connect to reception.</li><li><b>Build treatments.</b> Echo patients need a Resonance booth. Later, add an Unfolding studio and Groove lab. Put rooms close to reception for happier patients.</li><li><b>Hire & assign.</b> Open Staff, hire a clinician for Consultation and technicians for treatments. Each person needs a room assignment. Experts work 50% faster.</li><li><b>Open the clinic.</b> Patients walk, queue, receive diagnosis, seek treatment and leave cured. Match the door badges to the room inspector to spot bottlenecks.</li><li><b>Earn accreditation.</b> Reach all three objectives. Wages continue every second: dismiss idle staff, sell spare rooms, or use the one-time grant. Twelve walkouts, a balance below −$500, or inspection at 12:00 ends a scenario.</li></ol><p class="fineprint">Space pauses · Escape cancels building/dialogs · Save is manual · Loading starts paused · Complete all three scenarios to finish the campaign.</p>`,
+    `<p class="dialog-lead">Build a small hospital. Make unusual people feel better. Stay solvent.</p><ol class="handbook"><li><b>Plan while paused.</b> Pick Consultation, drag a 2–4 tile rectangle, then click a corridor tile directly beside a wall to place its door. Confirm the blueprint to pay. Coordinate, size and door controls offer a keyboard alternative. Corridors must connect to reception.</li><li><b>Build treatments.</b> Echo patients need a Resonance booth. Later, add an Unfolding studio and Groove lab. Put rooms close to reception for happier patients.</li><li><b>Hire & assign.</b> Open Staff, hire a clinician for Consultation and technicians for treatments. Each person needs a room assignment. Experts work 50% faster.</li><li><b>Open the clinic.</b> Patients walk, queue, receive diagnosis, seek treatment and leave cured. Match the door badges to the room inspector to spot bottlenecks.</li><li><b>Earn accreditation.</b> Reach all three objectives. Wages continue every second: dismiss idle staff, sell spare rooms, or use the one-time grant. Twelve walkouts, a balance below −$500, or inspection at 12:00 ends a scenario.</li></ol><p class="fineprint">Space pauses · Escape cancels building/dialogs · Save is manual · Loading starts paused · Complete all three scenarios to finish the campaign.</p>`,
   );
 }
 function furniture(kind: RoomKind) {
@@ -126,7 +140,7 @@ function drawRooms() {
         staff = roomStaff(game, r.id),
         queue = queueFor(game, r.id).length,
         service = serviceFor(game, r.id);
-      return `<div class="room ${selected === r.id ? "selected" : ""}" style="left:${(r.x / 12) * 100}%;top:${(r.y / 8) * 100}%;--room-color:${info.color}"><div class="room-wall"></div>${furniture(r.kind)}<span class="room-sign">${info.icon} ${r.kind === "consult" ? "Consultation" : r.kind === "echo" ? "Resonance" : r.kind === "paper" ? "Unfolding" : "Groove lab"}</span><span class="room-id">${r.id}</span><div class="door"></div><span class="queue-badge ${staff ? "" : "unstaffed"}">${!staff ? "! No staff" : service ? `● ${queue} waiting` : `${queue} waiting`}</span></div>`;
+      return `<div class="room ${selected === r.id ? "selected" : ""}" style="left:${(r.x / 12) * 100}%;top:${(r.y / 8) * 100}%;width:${(r.width / WIDTH) * 100}%;height:${(r.height / HEIGHT) * 100}%;--room-color:${info.color}"><div class="room-wall"></div>${furniture(r.kind)}<span class="room-sign">${info.icon} ${r.kind === "consult" ? "Consultation" : r.kind === "echo" ? "Resonance" : r.kind === "paper" ? "Unfolding" : "Groove lab"}</span><span class="room-id">${r.id}</span><div class="door ${r.entry.side}" style="${doorStyle(r)}"></div><span class="queue-badge ${staff ? "" : "unstaffed"}">${!staff ? "! No staff" : service ? `● ${queue} waiting` : `${queue} waiting`}</span></div>`;
     })
     .join("");
   document.querySelector("#scenery")!.innerHTML =
@@ -162,9 +176,11 @@ function drawPeople() {
         const key = `${p.x},${p.y}`;
         const offset = offsets.get(key) || 0;
         offsets.set(key, offset + 1);
-        const x = inRoom ? room.x + 0.9 : p.x + 0.2 + (offset % 3) * 0.22,
+        const x = inRoom
+            ? room.x + room.width * 0.45
+            : p.x + 0.2 + (offset % 3) * 0.22,
           y = inRoom
-            ? room.y + 1.05
+            ? room.y + room.height * 0.525
             : p.y + 0.1 + (Math.floor(offset / 3) % 2) * 0.26;
         return `<div class="person ${p.stage === "exit" ? "cured" : ""}" style="left:${(x / 12) * 100}%;top:${(y / 8) * 100}%" title="Patient ${p.id} · ${AILMENTS[p.ailment]}">${patientSvg(p)}${p.patience < 45 ? '<span class="impatient">!</span>' : ""}</div>`;
       })
@@ -246,7 +262,7 @@ function renderMetrics() {
   document.querySelector("#notice")!.innerHTML =
     `<span>${game.status === "won" ? "✓" : "✦"}</span><p>${esc(msg)}</p>`;
   document.querySelector("#director-tip")!.textContent = [
-    "Compact corridors make happy patients. The door is always below the left tile of a room.",
+    "Compact corridors make happy patients. Choose the door nearest your patients while keeping corridors open.",
     "Treatments are different jobs. Technicians can cure, but only clinicians can diagnose.",
     "A busy consultation room can hold up the whole hospital. Experts may be worth the extra wages.",
   ][game.scenario];
@@ -314,7 +330,7 @@ function renderSidebar() {
         member = roomStaff(game, room.id),
         patient = serviceFor(game, room.id),
         available = game.staff.filter((s) => eligible(s.role, room.kind));
-      sidebar.innerHTML = `<div class="panel-title"><span class="eyebrow">ROOM ${room.id} / INSPECTOR</span><h2>${info.name}</h2><p>${info.detail}</p></div><div class="room-portrait" style="--room-color:${info.color}">${furniture(room.kind)}</div><div class="room-stats"><div><b id="room-queue">${queueFor(game, room.id).length}</b><span>Waiting / en route</span></div><div><b>${info.duration}s</b><span>Base service time</span></div></div><div class="service-status" id="service-status">${patient ? `Patient #${patient.id} · ${Math.round((patient.progress / info.duration) * 100)}% complete` : member ? "Ready for the next patient" : "Waiting for an assigned staff member"}</div><label class="assignment-label">Room staff<select aria-label="Staff for room ${room.id}" data-room="${room.id}" ${game.status !== "active" ? "disabled" : ""}><option value="">No staff assigned</option>${available.map((s) => `<option value="${s.id}" ${member?.id === s.id ? "selected" : ""}>${esc(s.name)} · ${ROLE_INFO[s.role].name}${s.room && s.room !== room.id ? " (reassign)" : ""}</option>`).join("")}</select></label>${available.length ? "" : button("panel:staff", "Hire staff →", "primary full")}<p class="fineprint">Reassigning interrupts service until another worker takes over. ${member ? `Current wages ${money(ROLE_INFO[member.role].wage)}/sec.` : ""}</p>${button(`sell:${room.id}`, `Sell room · ${money(Math.floor(info.cost * 0.7))}`, "danger full", game.status !== "active" ? "disabled" : "")}`;
+      sidebar.innerHTML = `<div class="panel-title"><span class="eyebrow">ROOM ${room.id} / INSPECTOR</span><h2>${info.name}</h2><p>${info.detail} ${room.width}×${room.height} · ${room.entry.side} door · built for ${money(room.purchasePrice)}.</p></div><div class="room-portrait" style="--room-color:${info.color}">${furniture(room.kind)}</div><div class="room-stats"><div><b id="room-queue">${queueFor(game, room.id).length}</b><span>Waiting / en route</span></div><div><b>${info.duration}s</b><span>Base service time</span></div></div><div class="service-status" id="service-status">${patient ? `Patient #${patient.id} · ${Math.round((patient.progress / info.duration) * 100)}% complete` : member ? "Ready for the next patient" : "Waiting for an assigned staff member"}</div><label class="assignment-label">Room staff<select aria-label="Staff for room ${room.id}" data-room="${room.id}" ${game.status !== "active" ? "disabled" : ""}><option value="">No staff assigned</option>${available.map((s) => `<option value="${s.id}" ${member?.id === s.id ? "selected" : ""}>${esc(s.name)} · ${ROLE_INFO[s.role].name}${s.room && s.room !== room.id ? " (reassign)" : ""}</option>`).join("")}</select></label>${available.length ? "" : button("panel:staff", "Hire staff →", "primary full")}<p class="fineprint">Reassigning interrupts service until another worker takes over. ${member ? `Current wages ${money(ROLE_INFO[member.role].wage)}/sec.` : ""}</p>${button(`sell:${room.id}`, `Sell room · ${money(Math.floor(room.purchasePrice * 0.7))}`, "danger full", game.status !== "active" ? "disabled" : "")}`;
     } else
       sidebar.innerHTML = `<div class="panel-title"><span class="eyebrow">THE ESTATES DEPARTMENT</span><h2>Every room matters.</h2><p>Click a room on the floor to inspect its queue, assign staff, or sell it.</p></div>${game.rooms.length ? `<div class="room-list">${game.rooms.map((r) => button(`inspect:${r.id}`, `<span class="tool-icon" style="background:${ROOM_INFO[r.kind].color}">${ROOM_INFO[r.kind].icon}</span><span><b>${ROOM_INFO[r.kind].name}</b><small>#${r.id} · ${roomStaff(game, r.id) ? `${queueFor(game, r.id).length} waiting` : "Needs staff"}</small></span><span>→</span>`)).join("")}</div>` : '<div class="empty"><span>⌂</span><b>A blank floor. Big possibilities.</b><p>Build Consultation and a Resonance booth to begin.</p></div>'}<div class="ledger"><h3>The accounts</h3><p>Income <b>${money(game.income)}</b></p><p>Expenses <b>${money(game.expenses)}</b></p><small>Includes construction, hiring, wages, cures, diagnosis, grants and refunds.</small></div>`;
   }
@@ -335,6 +351,7 @@ function render(all = true) {
   renderMetrics();
   drawRooms();
   drawPeople();
+  if (tool) drawBlueprint();
   if (all) {
     renderToolbar();
     renderSidebar();
@@ -359,9 +376,12 @@ function render(all = true) {
 }
 function clearTool() {
   tool = null;
+  draft = null;
+  dragStart = null;
+  document.querySelector<HTMLElement>("#blueprint-controls")!.hidden = true;
   document.querySelector("#preview")!.innerHTML = "";
   document.querySelector("#plan-status")!.textContent =
-    "Select a room, then a tile. Build while paused.";
+    "Select a room, drag its rectangle, choose a wall door, then confirm.";
   renderToolbar();
 }
 function fresh(scenario: number) {
@@ -378,7 +398,7 @@ function scenarioIntro() {
   const s = SCENARIOS[game.scenario];
   openDialog(
     s.name,
-    `<p class="dialog-lead">${s.brief}</p><div class="brief-stats"><span><b>${money(s.cash)}</b>Starting budget</span><span><b>${s.cures}</b>Cures needed</span><span><b>${s.satisfaction}%</b>Happy patients</span></div><p><b>Your first steps:</b> build Consultation and ${s.ailments.map((a) => ROOM_INFO[a].name).join(", ")}. Hire one clinician for diagnosis and one technician per treatment. Then open the clinic.</p><p class="fineprint">All building and hiring can happen while paused. Rooms need a clear corridor to reception, and a door below their left tile.</p>`,
+    `<p class="dialog-lead">${s.brief}</p><div class="brief-stats"><span><b>${money(s.cash)}</b>Starting budget</span><span><b>${s.cures}</b>Cures needed</span><span><b>${s.satisfaction}%</b>Happy patients</span></div><p><b>Your first steps:</b> build Consultation and ${s.ailments.map((a) => ROOM_INFO[a].name).join(", ")}. Hire one clinician for diagnosis and one technician per treatment. Then open the clinic.</p><p class="fineprint">All building and hiring can happen while paused. Rooms need a clear corridor to reception, and a clear corridor tile beside their chosen wall door.</p>`,
     "Let’s build",
     null,
     `SCENARIO ${game.scenario + 1} OF 3`,
@@ -435,10 +455,34 @@ app.addEventListener("click", (event) => {
     case "build":
       tool = arg as RoomKind;
       selected = null;
-      document.querySelector("#plan-status")!.textContent =
-        `Place ${ROOM_INFO[tool].name} · ${money(ROOM_INFO[tool].cost)} · 2×2 + door below. Escape to cancel.`;
+      draft = {
+        x: 1,
+        y: 1,
+        width: 2,
+        height: 2,
+        entry: { side: "south", offset: 0 },
+      };
+      draftPhase = "size";
+      showBlueprintControls();
+      drawBlueprint();
       renderToolbar();
       renderSidebar();
+      break;
+    case "confirm-build":
+      if (tool && draft) {
+        error = buildRoom(game, tool, draft.x, draft.y, draft);
+        if (!error) {
+          selected = game.rooms.at(-1)!.id;
+          panel = "rooms";
+          clearTool();
+          render();
+          toast("Room built. Assign staff in the inspector.");
+        } else drawBlueprint();
+      }
+      break;
+    case "redraw-build":
+      draftPhase = "size";
+      drawBlueprint();
       break;
     case "cancel-build":
       clearTool();
@@ -480,7 +524,7 @@ app.addEventListener("click", (event) => {
       if (room)
         openDialog(
           "Sell this room?",
-          `<p>Receive ${money(Math.floor(ROOM_INFO[room.kind].cost * 0.7))}. Patients will seek another suitable room and staff will become unassigned.</p>`,
+          `<p>Receive ${money(Math.floor(room.purchasePrice * 0.7))}. Patients will seek another suitable room and staff will become unassigned.</p>`,
           "Sell room",
           () => {
             const e = sellRoom(game, id);
@@ -552,6 +596,65 @@ app.addEventListener("click", (event) => {
   }
   if (error) toast(error);
 });
+function doorStyle(r: RoomLayout): string {
+  const horizontal = r.entry.side === "north" || r.entry.side === "south";
+  return horizontal
+    ? `left:${((r.entry.offset + 0.15) / r.width) * 100}%;width:${70 / r.width}%;`
+    : `top:${((r.entry.offset + 0.15) / r.height) * 100}%;height:${70 / r.height}%;`;
+}
+function showBlueprintControls() {
+  const controls = document.querySelector<HTMLElement>("#blueprint-controls")!;
+  controls.hidden = !tool;
+  if (!draft || !tool) return;
+  controls.innerHTML = `<fieldset><legend>Room blueprint · no charge until confirmed</legend>${[
+    ["x", "Column", draft.x + 1, 1, WIDTH],
+    ["y", "Row", draft.y + 1, 1, HEIGHT],
+    ["width", "Width", draft.width, 2, 4],
+    ["height", "Height", draft.height, 2, 4],
+  ]
+    .map(
+      ([key, label, value, min, max]) =>
+        `<label>${label}<input type="number" data-blueprint="${key}" aria-label="Blueprint ${label}" value="${value}" min="${min}" max="${max}" step="1"></label>`,
+    )
+    .join("")}
+  <label>Door wall<select data-blueprint="side" aria-label="Door wall">${["north", "south", "west", "east"].map((side) => `<option ${draft!.entry.side === side ? "selected" : ""}>${side}</option>`).join("")}</select></label>
+  <label>Door tile<input type="number" data-blueprint="offset" aria-label="Door tile along wall" value="${draft.entry.offset + 1}" min="1" max="${["north", "south"].includes(draft.entry.side) ? draft.width : draft.height}"></label>
+  </fieldset><div>${button("confirm-build", "Confirm room", "primary")}${button("redraw-build", "Redraw footprint")}${button("cancel-build", "Cancel blueprint")}</div>`;
+}
+function drawBlueprint() {
+  if (!draft || !tool) return;
+  const error = placementError(game, tool, draft.x, draft.y, draft);
+  const candidate: Room = {
+    ...draft,
+    id: -1,
+    kind: tool,
+    purchasePrice: roomPrice(tool, draft.width, draft.height),
+  };
+  const d = door(candidate);
+  document.querySelector("#preview")!.innerHTML =
+    `<div class="ghost ${error ? "invalid" : ""}" style="left:${(draft.x / WIDTH) * 100}%;top:${(draft.y / HEIGHT) * 100}%;width:${(draft.width / WIDTH) * 100}%;height:${(draft.height / HEIGHT) * 100}%">${ROOM_INFO[tool].icon}<small>${draft.width}×${draft.height}</small><div class="door ${draft.entry.side}" style="${doorStyle(draft)}"></div></div><div class="door-marker ${error ? "invalid" : ""}" style="left:${(d.x / WIDTH) * 100}%;top:${(d.y / HEIGHT) * 100}%;width:${100 / WIDTH}%;height:${100 / HEIGHT}%">↥</div>`;
+  document.querySelector("#plan-status")!.textContent =
+    `${ROOM_INFO[tool].name} · ${money(candidate.purchasePrice)} · ${draftPhase === "size" ? "Drag a 2–4 tile rectangle (or edit the fields)." : "Click a corridor tile beside any wall for its door, then Confirm."} ${error || "Accessible blueprint. No cash spent yet."}`;
+}
+function chooseDoor(p: Point) {
+  if (!draft) return;
+  let side: DoorSide | null = null,
+    offset = 0;
+  if (p.x >= draft.x && p.x < draft.x + draft.width) {
+    if (p.y === draft.y - 1) side = "north";
+    if (p.y === draft.y + draft.height) side = "south";
+    offset = p.x - draft.x;
+  } else if (p.y >= draft.y && p.y < draft.y + draft.height) {
+    if (p.x === draft.x - 1) side = "west";
+    if (p.x === draft.x + draft.width) side = "east";
+    offset = p.y - draft.y;
+  }
+  if (side) {
+    draft.entry = { side, offset };
+    showBlueprintControls();
+    drawBlueprint();
+  }
+}
 tiles.addEventListener("click", (event) => {
   if (dialog.open || game.status !== "active") return;
   const tile = (event.target as Element).closest<HTMLButtonElement>(".tile");
@@ -559,46 +662,103 @@ tiles.addEventListener("click", (event) => {
   const x = Number(tile.dataset.x),
     y = Number(tile.dataset.y);
   if (tool) {
-    const error = buildRoom(game, tool, x, y);
-    if (error) {
-      toast(error);
-      return;
+    if (draftPhase === "door") chooseDoor({ x, y });
+    else if (event.detail === 0) {
+      draft = {
+        x,
+        y,
+        width: 2,
+        height: 2,
+        entry: { side: "south", offset: 0 },
+      };
+      draftPhase = "door";
+      showBlueprintControls();
+      drawBlueprint();
     }
-    selected = game.rooms.at(-1)!.id;
-    panel = "rooms";
-    clearTool();
-    render();
-    toast("Room built. Assign staff in the inspector.");
   } else {
     selected = game.rooms.find((r) => contains(r, { x, y }))?.id || null;
     panel = "rooms";
     render();
   }
 });
-function preview(tile: HTMLButtonElement) {
-  if (!tool) return;
-  const x = Number(tile.dataset.x),
-    y = Number(tile.dataset.y),
-    error = placementError(game, tool, x, y);
-  document.querySelector("#preview")!.innerHTML =
-    `<div class="ghost ${error ? "invalid" : ""}" style="left:${(x / 12) * 100}%;top:${(y / 8) * 100}%">${ROOM_INFO[tool].icon}<small>${error ? "×" : "✓"}</small></div>`;
-  document.querySelector("#plan-status")!.textContent =
-    error ||
-    `${ROOM_INFO[tool].name} · ${money(ROOM_INFO[tool].cost)} · Click to build. Door below the left tile.`;
+function pointerTile(event: PointerEvent): Point {
+  const rect = tiles.getBoundingClientRect();
+  return {
+    x: Math.max(
+      0,
+      Math.min(
+        WIDTH - 1,
+        Math.floor(((event.clientX - rect.left) / rect.width) * WIDTH),
+      ),
+    ),
+    y: Math.max(
+      0,
+      Math.min(
+        HEIGHT - 1,
+        Math.floor(((event.clientY - rect.top) / rect.height) * HEIGHT),
+      ),
+    ),
+  };
 }
-tiles.addEventListener("pointerover", (event) => {
-  const tile = (event.target as Element).closest<HTMLButtonElement>(".tile");
-  if (tile) preview(tile);
+function sizeDraft(p: Point) {
+  if (!dragStart) return;
+  draft = blueprintFromDrag(dragStart, p);
+  drawBlueprint();
+}
+tiles.addEventListener("pointerdown", (event) => {
+  if (
+    !tool ||
+    draftPhase !== "size" ||
+    event.button !== 0 ||
+    dialog.open ||
+    game.status !== "active"
+  )
+    return;
+  event.preventDefault();
+  dragStart = pointerTile(event);
+  tiles.setPointerCapture(event.pointerId);
+  sizeDraft(dragStart);
 });
-tiles.addEventListener("focusin", (event) => {
-  const tile = (event.target as Element).closest<HTMLButtonElement>(".tile");
-  if (tile) preview(tile);
+tiles.addEventListener("pointermove", (event) => {
+  if (dragStart) sizeDraft(pointerTile(event));
 });
-tiles.addEventListener("pointerleave", () => {
-  document.querySelector("#preview")!.innerHTML = "";
+tiles.addEventListener("pointerup", (event) => {
+  if (!dragStart) return;
+  sizeDraft(pointerTile(event));
+  dragStart = null;
+  draftPhase = "door";
+  if (tiles.hasPointerCapture(event.pointerId))
+    tiles.releasePointerCapture(event.pointerId);
+  showBlueprintControls();
+  drawBlueprint();
+});
+tiles.addEventListener("pointercancel", () => {
+  dragStart = null;
+  showBlueprintControls();
+  drawBlueprint();
 });
 app.addEventListener("change", (event) => {
   const select = event.target as HTMLSelectElement;
+  if (select.dataset.blueprint && draft) {
+    const key = select.dataset.blueprint;
+    if (key === "side") draft.entry.side = select.value as DoorSide;
+    else if (key === "offset") draft.entry.offset = Number(select.value) - 1;
+    else if (key === "x" || key === "y") draft[key] = Number(select.value) - 1;
+    else if (key === "width" || key === "height")
+      draft[key] = Number(select.value);
+    const span = ["north", "south"].includes(draft.entry.side)
+      ? draft.width
+      : draft.height;
+    draft.entry.offset = Math.max(0, Math.min(span - 1, draft.entry.offset));
+    const offset = document.querySelector<HTMLInputElement>(
+      '[data-blueprint="offset"]',
+    )!;
+    offset.max = String(span);
+    offset.value = String(draft.entry.offset + 1);
+    draftPhase = "door";
+    drawBlueprint();
+    return;
+  }
   let error = "";
   if (select.dataset.staff)
     error = assignStaff(

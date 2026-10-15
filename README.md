@@ -27,7 +27,7 @@ Development: `npm run dev`. Tests: `npm test`. Types: `npm run typecheck`. Secur
 
 ## How to play
 
-1. Build while paused: Consultation plus each available treatment. A room occupies 2×2 tiles; its door sits below the left tile. Every door and occupied corridor must stay connected to reception.
+1. Build while paused: Consultation plus each available treatment. Drag a 2–4 tile rectangle, choose any wall door, then confirm. Coordinate/size/door fields also work with a keyboard. The base 2×2 price grows by $80 per extra tile; canceling costs nothing. Every door and occupied corridor must stay connected to reception.
 2. Hire one clinician for Consultation and technicians for treatments. Assign them using the Staff panel or room inspector. Experts work faster and earn more. Idle staff still earn wages.
 3. Open the clinic. Watch patients walk, queue, receive diagnosis, seek their matching treatment and head home cured. Short routes improve satisfaction. Queue badges reveal congestion.
 4. Meet all accreditation goals: cures, satisfaction and cash reserve. Continue to the next hospital via the results dialog or persistent results button. Complete all three to win the campaign.
@@ -45,4 +45,6 @@ Space pauses; Escape cancels a dialog or building. Speed buttons control game ti
 
 Built with strict TypeScript and Vite. Deterministic simulation is isolated from rendering, storage and wall-clock time. Vitest tests exercise public management commands, routing, accounting, save validation and campaign objectives.
 
-All names, fictional ailments, visuals and maps are original. Theme Hospital inspired the broad room/staff/queue management loop; no commercial art, illness names, characters, maps, music or code are included. This is entertainment, not medical advice. No audio is included. Intentional simplifications: fixed room sizes and door orientation, deterministic arrivals, certain cures, no epidemics, research, mortality, or carry-over finances.
+All names, fictional ailments, visuals and maps are original. Theme Hospital inspired the broad room/staff/queue management loop; no commercial art, illness names, characters, maps, music or code are included. This is entertainment, not medical advice. No audio is included. Intentional simplifications: automatic equipment, 2–4 tile room dimensions, deterministic arrivals, certain cures, no epidemics, research, mortality, or carry-over finances.
+
+Focused correction: [room blueprint research, checks and acceptance route](docs/BLUEPRINT_FIDELITY.md). Legacy saves keep their original footprint, door coordinates and finances.

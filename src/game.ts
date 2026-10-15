@@ -4,9 +4,56 @@ export interface Point {
   x: number;
   y: number;
 }
-export interface Room extends Point {
+export type DoorSide = "north" | "south" | "west" | "east";
+export interface RoomLayout {
+  width: number;
+  height: number;
+  entry: { side: DoorSide; offset: number };
+}
+export interface Room extends Point, RoomLayout {
   id: number;
   kind: RoomKind;
+  purchasePrice: number;
+}
+export const DEFAULT_LAYOUT: RoomLayout = {
+  width: 2,
+  height: 2,
+  entry: { side: "south", offset: 0 },
+};
+export const roomPrice = (kind: RoomKind, width: number, height: number) =>
+  ROOM_INFO[kind].cost + (width * height - 4) * 80;
+function validLayout(layout: RoomLayout): boolean {
+  return (
+    !!layout &&
+    Number.isInteger(layout.width) &&
+    layout.width >= 2 &&
+    layout.width <= 4 &&
+    Number.isInteger(layout.height) &&
+    layout.height >= 2 &&
+    layout.height <= 4 &&
+    !!layout.entry &&
+    ["north", "south", "west", "east"].includes(layout.entry.side) &&
+    Number.isInteger(layout.entry.offset) &&
+    layout.entry.offset >= 0 &&
+    layout.entry.offset <
+      (["north", "south"].includes(layout.entry.side)
+        ? layout.width
+        : layout.height)
+  );
+}
+export function blueprintFromDrag(
+  start: Point,
+  end: Point,
+): Point & RoomLayout {
+  const x = start.x + Math.max(-3, Math.min(3, end.x - start.x));
+  const y = start.y + Math.max(-3, Math.min(3, end.y - start.y));
+  return {
+    x: Math.min(start.x, x),
+    y: Math.min(start.y, y),
+    width: Math.max(2, Math.abs(x - start.x) + 1),
+    height: Math.max(2, Math.abs(y - start.y) + 1),
+    entry: { side: "south", offset: 0 },
+  };
 }
 export interface Staff {
   id: number;
@@ -25,7 +72,7 @@ export interface Patient extends Point {
   progress: number;
 }
 export interface Game {
-  version: 1;
+  version: 2;
   scenario: number;
   tick: number;
   cash: number;
@@ -175,7 +222,7 @@ export function createGame(scenario = 0): Game {
   if (!Number.isInteger(scenario) || !SCENARIOS[scenario])
     throw new Error("Unknown scenario");
   return {
-    version: 1,
+    version: 2,
     scenario,
     tick: 0,
     cash: SCENARIOS[scenario].cash,
@@ -195,9 +242,17 @@ export function createGame(scenario = 0): Game {
   };
 }
 export const equal = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
-export const door = (r: Room): Point => ({ x: r.x, y: r.y + 2 });
-export const contains = (r: Point, p: Point) =>
-  p.x >= r.x && p.x < r.x + 2 && p.y >= r.y && p.y < r.y + 2;
+export function door(r: Room): Point {
+  const { side, offset } = r.entry;
+  if (side === "north") return { x: r.x + offset, y: r.y - 1 };
+  if (side === "south") return { x: r.x + offset, y: r.y + r.height };
+  if (side === "west") return { x: r.x - 1, y: r.y + offset };
+  return { x: r.x + r.width, y: r.y + offset };
+}
+export const contains = (
+  r: Point & { width: number; height: number },
+  p: Point,
+) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
 export function blocked(g: Game, p: Point, rooms = g.rooms): boolean {
   return (
     p.x < 0 ||
@@ -242,9 +297,10 @@ export function placementError(
   kind: RoomKind,
   x: number,
   y: number,
+  layout: RoomLayout = DEFAULT_LAYOUT,
 ): string {
   if (g.status !== "active") return "This scenario has ended.";
-  if (!ROOM_INFO[kind]) return "Choose a room type.";
+  if (!Object.hasOwn(ROOM_INFO, kind)) return "Choose a room type.";
   if (
     kind !== "consult" &&
     !SCENARIOS[g.scenario].ailments.some((a) => a === kind)
@@ -255,15 +311,24 @@ export function placementError(
     !Number.isInteger(y) ||
     x < 0 ||
     y < 0 ||
-    x + 1 >= WIDTH ||
-    y + 2 >= HEIGHT
+    !validLayout(layout) ||
+    x + layout.width > WIDTH ||
+    y + layout.height > HEIGHT
   )
-    return "Leave space for the door below the room.";
-  const candidate: Room = { id: -1, kind, x, y };
+    return "Choose a 2–4 tile rectangle inside the floor and a wall door.";
+  const candidate: Room = {
+    id: -1,
+    kind,
+    x,
+    y,
+    ...layout,
+    entry: { ...layout.entry },
+    purchasePrice: roomPrice(kind, layout.width, layout.height),
+  };
   if (contains(candidate, ENTRANCE))
     return "Keep the reception entrance clear.";
-  for (let dy = 0; dy < 2; dy++)
-    for (let dx = 0; dx < 2; dx++)
+  for (let dy = 0; dy < layout.height; dy++)
+    for (let dx = 0; dx < layout.width; dx++)
       if (blocked(g, { x: x + dx, y: y + dy }))
         return "The room overlaps another room or a garden.";
   if (g.rooms.some((r) => contains(candidate, door(r))))
@@ -279,7 +344,7 @@ export function placementError(
     )
   )
     return "Keep occupied corridors connected to reception.";
-  if (g.cash < ROOM_INFO[kind].cost)
+  if (g.cash < candidate.purchasePrice)
     return "Not enough cash. Sell a room or request your grant.";
   return "";
 }
@@ -288,12 +353,23 @@ export function buildRoom(
   kind: RoomKind,
   x: number,
   y: number,
+  layout: RoomLayout = DEFAULT_LAYOUT,
 ): string {
-  const error = placementError(g, kind, x, y);
+  const error = placementError(g, kind, x, y, layout);
   if (error) return error;
-  g.cash -= ROOM_INFO[kind].cost;
-  g.expenses += ROOM_INFO[kind].cost;
-  g.rooms.push({ id: g.nextId++, kind, x, y });
+  const purchasePrice = roomPrice(kind, layout.width, layout.height);
+  g.cash -= purchasePrice;
+  g.expenses += purchasePrice;
+  g.rooms.push({
+    id: g.nextId++,
+    kind,
+    x,
+    y,
+    width: layout.width,
+    height: layout.height,
+    entry: { ...layout.entry },
+    purchasePrice,
+  });
   return "";
 }
 export function eligible(role: Role, kind: RoomKind) {
@@ -345,7 +421,7 @@ export function sellRoom(g: Game, id: number): string {
   if (g.status !== "active") return "This scenario has ended.";
   const room = g.rooms.find((r) => r.id === id);
   if (!room) return "Room no longer exists.";
-  const refund = Math.floor(ROOM_INFO[room.kind].cost * 0.7);
+  const refund = Math.floor(room.purchasePrice * 0.7);
   g.cash += refund;
   g.income += refund;
   g.staff.filter((s) => s.room === id).forEach((s) => (s.room = null));
@@ -353,8 +429,7 @@ export function sellRoom(g: Game, id: number): string {
     .filter((p) => p.target === id)
     .forEach((p) => {
       if (p.mode === "service") {
-        p.x = room.x;
-        p.y = room.y + 2;
+        Object.assign(p, door(room));
       }
       p.target = null;
       p.mode = "walking";
@@ -546,6 +621,7 @@ export function restoreGame(text: string): Game {
   };
   if (text.length > 150000) invalid();
   let g: Game;
+  let legacy = false;
   try {
     g = JSON.parse(text);
   } catch {
@@ -554,7 +630,7 @@ export function restoreGame(text: string): Game {
   g = g!;
   if (
     !g ||
-    g.version !== 1 ||
+    ![1, 2].includes(g.version) ||
     !Number.isInteger(g.scenario) ||
     !SCENARIOS[g.scenario]
   )
@@ -601,6 +677,19 @@ export function restoreGame(text: string): Game {
     g.patients.length > 40
   )
     invalid();
+  legacy = (g.version as number) === 1;
+  if (legacy) {
+    for (const r of g.rooms) {
+      if (!r || !Object.hasOwn(ROOM_INFO, r.kind)) invalid();
+      Object.assign(r, {
+        width: 2,
+        height: 2,
+        entry: { side: "south", offset: 0 },
+        purchasePrice: ROOM_INFO[r.kind].cost,
+      });
+    }
+    g.version = 2;
+  }
   const ids = new Set<number>();
   const id = (v: number) => {
     if (!integer(v, 1, g.nextId - 1) || ids.has(v)) invalid();
@@ -610,8 +699,10 @@ export function restoreGame(text: string): Game {
     if (
       !r ||
       !Object.hasOwn(ROOM_INFO, r.kind) ||
-      !integer(r.x, 0, WIDTH - 2) ||
-      !integer(r.y, 0, HEIGHT - 3)
+      !validLayout(r) ||
+      !integer(r.x, 0, WIDTH - r.width) ||
+      !integer(r.y, 0, HEIGHT - r.height) ||
+      r.purchasePrice !== roomPrice(r.kind, r.width, r.height)
     )
       invalid();
     if (
@@ -626,12 +717,10 @@ export function restoreGame(text: string): Game {
       g.rooms.some(
         (q) =>
           q !== r &&
-          [
-            { x: q.x, y: q.y },
-            { x: q.x + 1, y: q.y },
-            { x: q.x, y: q.y + 1 },
-            { x: q.x + 1, y: q.y + 1 },
-          ].some((p) => contains(r, p)),
+          r.x < q.x + q.width &&
+          r.x + r.width > q.x &&
+          r.y < q.y + q.height &&
+          r.y + r.height > q.y,
       ) ||
       path(g, ENTRANCE, door(r)) === null
     )
@@ -723,7 +812,18 @@ export function restoreGame(text: string): Game {
   const clean = createGame(g.scenario);
   for (const key of Object.keys(clean) as (keyof Game)[])
     Object.assign(clean, { [key]: g[key] });
-  clean.rooms = g.rooms.map(({ id, kind, x, y }) => ({ id, kind, x, y }));
+  clean.rooms = g.rooms.map(
+    ({ id, kind, x, y, width, height, entry, purchasePrice }) => ({
+      id,
+      kind,
+      x,
+      y,
+      width,
+      height,
+      entry: { side: entry.side, offset: entry.offset },
+      purchasePrice,
+    }),
+  );
   clean.staff = g.staff.map(({ id, name, role, room }) => ({
     id,
     name,
