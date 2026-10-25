@@ -48,3 +48,7 @@ Built with strict TypeScript and Vite. Deterministic simulation is isolated from
 All names, fictional ailments, visuals and maps are original. Theme Hospital inspired the broad room/staff/queue management loop; no commercial art, illness names, characters, maps, music or code are included. This is entertainment, not medical advice. No audio is included. Intentional simplifications: automatic equipment, 2–4 tile room dimensions, deterministic arrivals, certain cures, no epidemics, research, mortality, or carry-over finances.
 
 Focused correction: [room blueprint research, checks and acceptance route](docs/BLUEPRINT_FIDELITY.md). Legacy saves keep their original footprint, door coordinates and finances.
+
+## Play online
+
+[Play the hosted game](https://intrepion.github.io/kata-inspired-by-theme-hospital-codex-dot/)
