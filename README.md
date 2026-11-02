@@ -52,3 +52,7 @@ Focused correction: [room blueprint research, checks and acceptance route](docs/
 ## Play online
 
 [Play the hosted game](https://intrepion.github.io/kata-inspired-by-theme-hospital-codex-dot/)
+
+## Arcade metadata
+
+See [docs/arcade-metadata.md](docs/arcade-metadata.md) for the game-owned manifest and screenshot provenance.

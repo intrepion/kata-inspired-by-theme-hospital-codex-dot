@@ -19,6 +19,7 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - run: npm ci
+      - run: node scripts/verify-arcade.mjs
       - run: npm test
       - run: npm run build -- --base=./
       - uses: actions/upload-pages-artifact@v4
