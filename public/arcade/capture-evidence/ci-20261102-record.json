@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "workflowCommit": "d9b43637e7546ff119622e687b69e97d17f37df4",
+  "sourceCommit": "963d5bd9c5b0c3dbd5f6db8be0feafb697344450",
+  "runId": "41434022425",
+  "url": "http://127.0.0.1:4273/",
+  "inputs": {
+    "index.html": "540991ebb10ac3dbbfb278e5565caa48587ef49387f3540571534dfd64248e0a",
+    "assets/index-BIKCjqS1.js": "810761b7b3e82fd85534143794c4d969e7ea76a19dbe6a232c9a4cc61fee0066",
+    "assets/index-DmWg6GlS.css": "0842b00d8653a34f6d3919f454cfc9ad98443d672c30337ca6ee6f96f830b02a"
+  },
+  "browser": "153.0.8010.12",
+  "viewport": {
+    "width": 1280,
+    "height": 1000
+  },
+  "screenshots": [
+    "oddwell-01.png",
+    "oddwell-02.png"
+  ]
+}

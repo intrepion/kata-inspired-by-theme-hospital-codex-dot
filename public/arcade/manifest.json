@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "gameId": "kata-inspired-by-theme-hospital-codex-dot",
   "playUrl": "https://intrepion.github.io/kata-inspired-by-theme-hospital-codex-dot/",
   "screenshots": [
@@ -23,6 +23,46 @@
         "sourcePath": "docs/qa/fidelity-2026-10-15/in-treatment.jpg",
         "deployedBuild": null,
         "captureDate": null
+      }
+    },
+    {
+      "path": "arcade/screenshots/ci-20261102-01.jpg",
+      "sha256": "51451bd9f09b29eb418c12b6fe4f2aae64ab37005db3da8ef0d53f2fbe065ad7",
+      "alt": "Oddwell Hospital gameplay, view 1",
+      "provenance": {
+        "kind": "ci_gameplay_capture",
+        "sourcePath": "arcade/capture-evidence/ci-20261102-01.png",
+        "sourceSha256": "1ec3636f89256abf06149f514d702e4224331586ab0a6c8354505cd9ad3f2e43",
+        "captureCommit": "963d5bd9c5b0c3dbd5f6db8be0feafb697344450",
+        "workflowRunId": "41434022425",
+        "inputHashes": {
+          "index.html": "540991ebb10ac3dbbfb278e5565caa48587ef49387f3540571534dfd64248e0a",
+          "assets/index-BIKCjqS1.js": "810761b7b3e82fd85534143794c4d969e7ea76a19dbe6a232c9a4cc61fee0066",
+          "assets/index-DmWg6GlS.css": "0842b00d8653a34f6d3919f454cfc9ad98443d672c30337ca6ee6f96f830b02a"
+        },
+        "publishedFilesVerifiedAt": "2026-11-02T19:01:20Z",
+        "captureRecordPath": "arcade/capture-evidence/ci-20261102-record.json",
+        "captureRecordSha256": "110b29e84cc3598b34f28a3e89232f7ef548bc018b90b159e14b82b0611c14ed"
+      }
+    },
+    {
+      "path": "arcade/screenshots/ci-20261102-02.jpg",
+      "sha256": "c4fb8da208de045b70f5d58045acf22c99c6b78e1bf2bf4a02432e0e150fa510",
+      "alt": "Oddwell Hospital gameplay, view 2",
+      "provenance": {
+        "kind": "ci_gameplay_capture",
+        "sourcePath": "arcade/capture-evidence/ci-20261102-02.png",
+        "sourceSha256": "fa414c157cb52e16bdf014433fcb24a371f55856d37f28a8c41b4ec5565a452d",
+        "captureCommit": "963d5bd9c5b0c3dbd5f6db8be0feafb697344450",
+        "workflowRunId": "41434022425",
+        "inputHashes": {
+          "index.html": "540991ebb10ac3dbbfb278e5565caa48587ef49387f3540571534dfd64248e0a",
+          "assets/index-BIKCjqS1.js": "810761b7b3e82fd85534143794c4d969e7ea76a19dbe6a232c9a4cc61fee0066",
+          "assets/index-DmWg6GlS.css": "0842b00d8653a34f6d3919f454cfc9ad98443d672c30337ca6ee6f96f830b02a"
+        },
+        "publishedFilesVerifiedAt": "2026-11-02T19:01:20Z",
+        "captureRecordPath": "arcade/capture-evidence/ci-20261102-record.json",
+        "captureRecordSha256": "110b29e84cc3598b34f28a3e89232f7ef548bc018b90b159e14b82b0611c14ed"
       }
     }
   ]
